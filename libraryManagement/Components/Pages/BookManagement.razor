@@ -1,0 +1,233 @@
+﻿@page "/BookManagement"
+@using Services;
+@using Models;
+@using ViewModels;
+@using Utils;
+@inject GenericityService genericityService;
+@inject BookViewModel BookVM;
+@inject MessageHelper msgHelper;
+
+<h1>Book Management</h1>
+
+<div class="row align-items-end mb-3">
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Title</label>
+            <input class="form-control" placeholder="Title" @bind-value="inputTitle" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Author</label>
+            <input class="form-control" placeholder="Author" @bind-value="inputAuthor" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Publisher</label>
+            <input class="form-control" placeholder="Publisher" @bind-value="inputPublisher" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Publish Date</label>
+            <input type="date" class="form-control" placeholder="PublishDate" @bind-value="inputPublishDate" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>ISBN</label>
+            <input class="form-control" placeholder="ISBN" @bind-value="inputISBN" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Stock</label>
+            <input class="form-control" placeholder="Stock" @bind-value="inputStock" />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3 d-flex justify-content-start align-items-end">
+        <button type="submit" class="btn btn-primary me-2" @onclick="Search">Search</button>
+        <button type="submit" class="btn btn-primary me-2" @onclick="Add">Add</button>
+        <button type="submit" class="btn btn-secondary me-2" @onclick="Update">Update</button>
+        <button type="submit" class="btn btn-danger" @onclick="Remove">Remove</button>
+    </div>
+</div>
+
+<div class="row">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Book Id</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Publisher</th>
+                <th>ISBN</th>
+                <th>Publish Date</th>
+                <th>Stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (BookVM.PagedBooks == null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                @foreach (var book in BookVM.PagedBooks)
+                {
+                    <tr class="@(selectedBook == book ? "table-primary" : "")" @onclick="() => Select(book)">
+                        <td>@book.Id</td>
+                        <td>@book.Title</td>
+                        <td>@book.Author</td>
+                        <td>@book.Publisher</td>
+                        <td>@book.ISBN</td>
+                        <td>@book.PublishDate.ToShortDateString()</td>
+                        <td>@book.Stock</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination d-flex align-items-center justify-content-end" style="align-content: center">
+    <button class="btn btn-primary me-2" @onclick="BookVM.PreviousPage" disabled="@(!BookVM.HasPreviousPage)">Previous</button>
+    <span class="me-2">Page @BookVM.CurrentPage of @BookVM.TotalPages</span>
+    <button class="btn btn-primary me-2" @onclick="BookVM.NextPage" disabled="@(!BookVM.HasNextPage)">Next</button>
+    <button class="btn btn-primary me-2" @onclick="() => JumpPage(pageNumber)">Jump To</button>
+    <input class="form-control me-2" style="width: 50px; height: 30px; padding: 2px;" placeholder="@BookVM.CurrentPage" @bind-value="@pageNumber" />
+</div>
+
+@code {
+    private bool HasPreviousPage => BookVM.CurrentPage > 1;
+    private bool HasNextPage => BookVM.CurrentPage < BookVM.TotalPages;
+    private static int pageNumber = 0;
+
+    private string inputTitle = "";
+    private string inputAuthor = "";
+    private string inputPublisher = "";
+    private string inputISBN = "";
+    private DateTime inputPublishDate = DateTime.Now;
+    private int inputStock = 0;
+
+    private Models.Book selectedBook;
+    private List<Models.Book> books;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await BookVM.LoadBooksAsync();
+        books = await genericityService.GetObjects<Models.Book>();
+    }
+
+    private void Select(Models.Book book)
+    {
+        selectedBook = book;
+        inputTitle = selectedBook.Title;
+        inputAuthor = selectedBook.Author;
+        inputPublisher = selectedBook.Publisher;
+        inputISBN = selectedBook.ISBN;
+        inputPublishDate = selectedBook.PublishDate;
+        inputStock = selectedBook.Stock;
+    }
+
+    private async Task Search()
+    {
+        Dictionary<string, string> dict = new Dictionary<string, string>();
+
+        if (!string.IsNullOrEmpty(inputTitle))
+        {
+            dict.Add("Title", inputTitle);
+        }
+
+        if (!string.IsNullOrEmpty(inputAuthor))
+        {
+            dict.Add("Author", inputAuthor);
+        }
+
+        if (!string.IsNullOrEmpty(inputPublisher))
+        {
+            dict.Add("Publisher", inputPublisher);
+        }
+
+        if (!string.IsNullOrEmpty(inputISBN))
+        {
+            dict.Add("ISBN", inputISBN);
+        }
+
+        Console.WriteLine(dict);
+        await BookVM.Search(dict);
+    }
+
+    private async Task Add()
+    {
+        if (string.IsNullOrEmpty(inputTitle) || string.IsNullOrEmpty(inputAuthor) || string.IsNullOrEmpty(inputPublisher) || string.IsNullOrEmpty(inputISBN) || inputStock == 0)
+        {
+            await msgHelper.ShowMessage("Title, Author, Publisher, ISBN or Stock is null!");
+            return;
+        }
+
+        var isExist = await BookVM.CheckExist(inputISBN);
+        if (isExist)
+        {
+            await msgHelper.ShowMessage("A Book with the same ID or ISBN already exists!");
+            return;
+        }
+
+        Models.Book newBook = new Models.Book
+            {
+                Title = inputTitle,
+                Author = inputAuthor,
+                Publisher = inputPublisher,
+                ISBN = inputISBN,
+                PublishDate = inputPublishDate,
+                Stock = inputStock
+            };
+
+        await BookVM.AddBookAsync(newBook);
+    }
+
+    private async Task Update()
+    {
+        if (string.IsNullOrEmpty(inputTitle) || string.IsNullOrEmpty(inputAuthor) || string.IsNullOrEmpty(inputPublisher) || string.IsNullOrEmpty(inputISBN) || inputStock == 0)
+        {
+            await msgHelper.ShowMessage("Title, Author, Publisher, ISBN or Stock is null!");
+            return;
+        }
+        if (selectedBook == null)
+        {
+            await msgHelper.ShowMessage("No book is selected!");
+            return;
+        }
+
+        selectedBook.Title = inputTitle;
+        selectedBook.Author = inputAuthor;
+        selectedBook.Publisher = inputPublisher;
+        selectedBook.ISBN = inputISBN;
+        selectedBook.PublishDate = inputPublishDate;
+        selectedBook.Stock = inputStock;
+
+        await BookVM.UpdateBookAsync(selectedBook);
+    }
+
+    private async Task Remove()
+    {
+        if (selectedBook == null)
+        {
+            await msgHelper.ShowMessage("No book is selected");
+            return;
+        }
+        await BookVM.DeleteBookAsync(selectedBook);
+    }
+
+    private void JumpPage(int pageNumber)
+    {
+        if (pageNumber > 0 && pageNumber <= BookVM.TotalPages)
+        {
+            BookVM.CurrentPage = pageNumber;
+        }
+    }
+}
