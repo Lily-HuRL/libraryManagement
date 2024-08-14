@@ -1,0 +1,420 @@
+﻿@page "/RentalManagement"
+
+@using Services;
+@using Models;
+@using ViewModels;
+@using Utils;
+@inject GenericityService genericityService;
+@inject RentalViewModel BookRentalVM;
+@inject StudentViewModel StudentVM;
+@inject BookViewModel BookVM;
+@inject MessageHelper msgHelper;
+
+<h1>Book Rental Management</h1>
+
+@if (showModal)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Book Rental</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Student ID</label>
+                        <input class="form-control" value="@inputStudentID" readonly />
+                    </div>
+                    <div class="form-group">
+                        <label>Book ID</label>
+                        <input class="form-control" placeholder="Book ID" @bind-value="inputBookID" />
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input class="form-control" placeholder="Quantity" @bind-value="inputQuantity" />
+                    </div>
+                    <button type="button" class="btn btn-primary" @onclick="AddBookToRental">Add Book</button>
+
+                    <table class="table mt-3">
+                        <thead>
+                            <tr>
+                                <th>Book ID</th>
+                                <th>Book Title</th>
+                                <th>Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in tempRentalBooks)
+                            {
+                                <tr>
+                                    <td>@item.Book.Id</td>
+                                    <td>@item.Book.Title</td>
+                                    <td>@item.Quantity</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <div class="form-group">
+                        <label>Total Books</label>
+                        <input class="form-control" @bind-value="totalBooks" readonly />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="CompleteRental">Complete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+<div class="row align-items-end mb-3">
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Student ID</label>
+            <input class="form-control" placeholder="Student ID" @bind-value="inputStudentID" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Rental Date</label>
+            <input type="date" class="form-control" @bind-value="inputRentalDate" />
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="form-group">
+            <label>Return Date</label>
+            <input type="date" class="form-control" @bind-value="inputReturnDate" />
+        </div>
+    </div>
+    <div class="col-md-3 d-flex justify-content-end align-items-end">
+        <button type="submit" class="btn btn-primary me-2" @onclick="Borrow">Borrow</button>
+        <button type="submit" class="btn btn-danger" @onclick="Return">Return</button>
+    </div>
+</div>
+
+<div class="row">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Rental ID</th>
+                <th>Student ID</th>
+                <th>Student Name</th>
+                <th>Rental Date</th>
+                <th>Return Date</th>
+                <th>Total Books</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (BookRentalVM.PagedRentals == null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                @foreach (var rental in BookRentalVM.PagedRentals)
+                {
+                    <tr class="@(selectedRental == rental ? "table-primary" : "")" @onclick="() => Select(rental)">
+                        <td>@rental.Id</td>
+                        <td>@rental.Student.Id</td>
+                        <td>@rental.Student.FirstName @rental.Student.LastName</td>
+                        <td>@rental.RentalDate.ToString("yyyy-MM-dd")</td>
+                        <td>@rental.ReturnDate.ToString("yyyy-MM-dd")</td>
+                        <td>@rental.RentalBooks.Sum(rb => rb.Quantity)</td>
+                        <td>
+                            @string.Join(", ", rental.RentalBooks.Select(rb => $"{rb.Book.Title} * {rb.Quantity}"))
+                        </td>
+
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination d-flex align-items-center justify-content-end" style="align-content: center">
+    <button class="btn btn-primary me-2" @onclick="BookRentalVM.PreviousPage" disabled="@(!BookRentalVM.HasPreviousPage)">Previous</button>
+    <span class="me-2">Page @BookRentalVM.CurrentPage of @BookRentalVM.TotalPages</span>
+    <button class="btn btn-primary me-2" @onclick="() => JumpPage(pageNumber)">Jump To</button>
+    <input class="form-control me-2" style="width: 50px; height: 30px; padding: 2px;" placeholder="@BookRentalVM.CurrentPage" @bind-value="@pageNumber" />
+</div>
+
+@code {
+    private bool HasPreviousPage => BookRentalVM.CurrentPage > 1;
+    private bool HasNextPage => BookRentalVM.CurrentPage < BookRentalVM.TotalPages;
+    private static int pageNumber = 0;
+
+
+    private bool showModal = false;
+    private int inputStudentID = 0;
+    private int inputRentalID = 0;
+    private int inputBookID = 0;
+    private int inputQuantity = 0;
+    private int totalBooks = 0;
+    private DateTime inputRentalDate = DateTime.Today;
+    private DateTime inputReturnDate = DateTime.Today;
+
+    private List<RentalBooks> tempRentalBooks = new();
+
+    private Rental selectedRental;
+    private List<Rental> rentals;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"OnInitializedAsync Error: {ex.Message}");
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            if (StudentVM.Students == null || !StudentVM.Students.Any())
+            {
+                await StudentVM.LoadStudentsAsync();
+            }
+
+            if (BookVM.Books == null || !BookVM.Books.Any())
+            {
+                await BookVM.LoadBooksAsync();
+            }
+
+            await BookRentalVM.LoadRentalsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LoadData Error: {ex.Message}");
+        }
+    }
+
+    private void OpenModal()
+    {
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        selectedRental = null; // Discard the unsaved Rental
+        tempRentalBooks.Clear(); // Clear any temporary rental books
+        totalBooks = 0; // Reset the total books count
+        showModal = false;
+    }
+
+    private void ResetModal()
+    {
+        inputBookID = 0;
+        inputQuantity = 0;
+        totalBooks = 0;
+        tempRentalBooks.Clear();
+    }
+
+    private async Task Borrow()
+    {
+        if (inputStudentID == 0)
+        {
+            await msgHelper.ShowMessage("Please Input Student ID!");
+            return;
+        }
+
+        var studentExists = await StudentVM.CheckExist(inputStudentID);
+        if (!studentExists)
+        {
+            await msgHelper.ShowMessage("Student ID does not exist!");
+            return;
+        }
+
+        OpenModal(); // Open the modal to input RentalBooks
+    }
+
+    private async Task CompleteRental()
+    {
+        if (!tempRentalBooks.Any())
+        {
+            await msgHelper.ShowMessage("No books selected!");
+            return;
+        }
+
+        // Create new Rental
+        var student = StudentVM.Students.First(s => s.Id == inputStudentID);
+        var newRental = new Rental
+            {
+                Student = student,
+                RentalDate = inputRentalDate,
+                ReturnDate = inputReturnDate,
+                RentalBooks = new List<RentalBooks>() // Initialize as empty, books will be added later
+            };
+
+        await BookRentalVM.AddRentalAsync(newRental);
+
+        try
+        {
+
+            // Now that Rental ID is generated, update RentalBooks with the Rental ID and Rental reference
+            foreach (var rentalBook in tempRentalBooks)
+            {
+                rentalBook.RentalID = newRental.Id;
+                rentalBook.Rental = newRental;
+
+                // Update the book's stock
+                var book = rentalBook.Book;
+                if (book.Stock >= rentalBook.Quantity)
+                {
+                    book.Stock -= rentalBook.Quantity;
+                    await BookVM.UpdateBookAsync(book); // Save the updated book stock
+                }
+                else
+                {
+                    await msgHelper.ShowMessage($"Not enough stock for book ID {book.Id}. Available: {book.Stock}, requested: {rentalBook.Quantity}");
+                    return;
+                }
+                newRental.RentalBooks.Add(rentalBook);
+            }
+
+            // Save updated Rental with books
+            await BookRentalVM.UpdateRentalAsync(newRental);
+
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CompleteRental Error: {ex.Message}");
+        }
+    }
+
+    private async Task AddBookToRental()
+    {
+        var book = BookVM.Books.FirstOrDefault(b => b.Id == inputBookID);
+        if (book != null && inputQuantity > 0)
+        {
+            if (book.Stock >= inputQuantity)
+            {
+                var rentalBook = new RentalBooks
+                    {
+                        Book = book,
+                        Quantity = inputQuantity,
+                        RentalID = 0, // Initially set to 0, will be updated after Rental is created
+                        Rental = null // Initially null, will be updated after Rental is created
+                    };
+                tempRentalBooks.Add(rentalBook);
+                totalBooks += rentalBook.Quantity;
+            }
+            else
+            {
+                await msgHelper.ShowMessage($"Not enough stock for book ID {book.Id}. Available: {book.Stock}, requested: {inputQuantity}");
+            }
+        }
+        else
+        {
+            await msgHelper.ShowMessage("Invalid Book ID or Quantity");
+        }
+    }
+
+
+    private void Select(Rental rental)
+    {
+        selectedRental = rental;
+        inputStudentID = selectedRental.Student.Id;
+        inputRentalID = selectedRental.Id;
+        inputRentalDate = selectedRental.RentalDate;
+        inputReturnDate = selectedRental.ReturnDate;
+        totalBooks = selectedRental.RentalBooks.Sum(rb => rb.Quantity);
+        tempRentalBooks = selectedRental.RentalBooks.ToList();
+    }
+
+    private async Task Search()
+    {
+        Dictionary<string, string> filters = new Dictionary<string, string>();
+
+        if (inputRentalID != 0)
+        {
+            filters.Add("Id", inputRentalID.ToString());
+        }
+
+        if (inputStudentID != 0)
+        {
+            filters.Add("StudentId", inputStudentID.ToString());
+        }
+
+        if (inputRentalDate != DateTime.MinValue)
+        {
+            filters.Add("RentalDate", inputRentalDate.ToString("yyyy-MM-dd"));
+        }
+
+        if (inputReturnDate != DateTime.MinValue)
+        {
+            filters.Add("ReturnDate", inputReturnDate.ToString("yyyy-MM-dd"));
+        }
+
+        await BookRentalVM.Search(filters);
+    }
+
+    private async Task Update()
+    {
+        if (inputStudentID == 0 || !tempRentalBooks.Any())
+        {
+            await msgHelper.ShowMessage("Student or books are missing!");
+            return;
+        }
+
+        selectedRental.Student = StudentVM.Students.First(s => s.Id == inputStudentID);
+        selectedRental.RentalDate = inputRentalDate;
+        selectedRental.ReturnDate = inputReturnDate;
+        selectedRental.RentalBooks = tempRentalBooks;
+
+        try
+        {
+            await BookRentalVM.UpdateRentalAsync(selectedRental);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Update Error: {ex.Message}");
+        }
+    }
+
+    private async Task Return()
+    {
+        if (selectedRental == null)
+        {
+            await msgHelper.ShowMessage("No rental is selected");
+            return;
+        }
+
+        try
+        {
+            // Increase the stock for each book in the rental
+            foreach (var rentalBook in selectedRental.RentalBooks)
+            {
+                var book = rentalBook.Book;
+                book.Stock += rentalBook.Quantity; // Increase the stock by the quantity of books rented
+                await BookVM.UpdateBookAsync(book); // Save the updated book stock
+            }
+
+            // Delete the rental after updating the stock
+            await BookRentalVM.DeleteRentalAsync(selectedRental);
+
+            selectedRental = null; // Reset selected rental after return
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Return Error: {ex.Message}");
+        }
+    }
+
+
+    private void JumpPage(int pageNumber)
+    {
+        if (pageNumber > 0 && pageNumber <= BookRentalVM.TotalPages)
+        {
+            BookRentalVM.CurrentPage = pageNumber;
+        }
+    }
+}
+
