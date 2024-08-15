@@ -29,7 +29,7 @@ namespace libraryManagement
 
             // Setup SQLite database path
 
-            string dbPath = "C:/Users/12206/Desktop/OOP2 assignments/libraryManagement/libraryManagement/library.db";
+            string dbPath = "C:\\SAIT\\SD program\\2nd Semester\\Object-Oriented Programming 2\\project\\final\\libraryManagement\\libraryManagement\\library.db";
 
             // Register SQLite connection as a singleton
             builder.Services.AddSingleton<SQLiteAsyncConnection>(s =>
