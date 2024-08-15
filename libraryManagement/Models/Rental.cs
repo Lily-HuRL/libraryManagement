@@ -1,21 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SQLite;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace libraryManagement.Models
 {
+    [SQLite.Table("Rentals")]
     public class Rental
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        [PrimaryKey, AutoIncrement]
         public int Id { get; set; }
-        public required DateTime RentalDate { get; set; }
-        public required DateTime ReturnDate { get; set; }
-        public required Student Student { get; set; }
-        public required List<RentalBooks> RentalBooks { get; set; }
+        public DateTime RentalDate { get; set; }
+        public DateTime ReturnDate { get; set; }
+        public int StudentId { get; set; }
+
+        [Ignore]
+        public List<RentalBooks> RentalBooks { get; set; } = new List<RentalBooks>();
+        [Ignore]
+        public Student Student { get; set; }
     }
 }
+

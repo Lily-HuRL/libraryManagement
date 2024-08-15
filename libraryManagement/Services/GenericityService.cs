@@ -1,11 +1,10 @@
-﻿using System;
+﻿using libraryManagement.Data;
+using SQLite;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 using System.Threading.Tasks;
-using libraryManagement.Data;
-using Microsoft.EntityFrameworkCore;
+using libraryManagement.Models;
 
 namespace libraryManagement.Services
 {
@@ -15,74 +14,116 @@ namespace libraryManagement.Services
 
         public GenericityService(AppDbContext context)
         {
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
-        public async Task<List<T>> GetObjects<T>(params Expression<Func<T, object>>[] includes) where T : class
+        public async Task EnsureTableExists<T>() where T : class, new()
         {
             try
             {
-                IQueryable<T> query = _context.Set<T>();
+                await _context._database.CreateTableAsync<T>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"EnsureTableExists<{typeof(T).Name}> Error: {ex.Message}");
+            }
+        }
 
-                foreach (var include in includes)
-                {
-                    query = query.Include(include);
-                }
+        public async Task<List<T>> GetObjects<T>(params Expression<Func<T, object>>[] includes) where T : class, new()
+        {
+            try
+            {
+                await EnsureTableExists<T>();  // Ensure the table exists before fetching data
+                return await _context._database.Table<T>().ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"GetObjects<{typeof(T).Name}> Error: {ex.Message}");
+                throw;
+            }
+        }
 
+        public async Task AddItemAsync<T>(T item) where T : class, new()
+        {
+            try
+            {
+                await EnsureTableExists<T>();  // Ensure the table exists before adding data
+                await _context._database.InsertAsync(item);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"AddItemAsync<{typeof(T).Name}> Error: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task UpdateItemAsync<T>(T item) where T : class, new()
+        {
+            try
+            {
+                await EnsureTableExists<T>();  // Ensure the table exists before updating data
+                await _context._database.UpdateAsync(item);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"UpdateItemAsync<{typeof(T).Name}> Error: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task DeleteItemAsync<T>(T item) where T : class, new()
+        {
+            try
+            {
+                await EnsureTableExists<T>();  // Ensure the table exists before deleting data
+                await _context._database.DeleteAsync(item);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"DeleteItemAsync<{typeof(T).Name}> Error: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<List<T>> Search<T>(Dictionary<string, string> filters) where T : class, new()
+        {
+            try
+            {
+                await EnsureTableExists<T>();  // Ensure the table exists before searching data
+                var query = _context._database.Table<T>();
+                // Applying filters is more complex and would require custom implementation
+                // You can loop through filters and apply them conditionally if needed
                 return await query.ToListAsync();
             }
             catch (Exception ex)
             {
-                throw new Exception($"GetObjects<{typeof(T).Name}> Error: {ex.Message}"); // throw the exception to ensure it can be caught further up the stack
+                Console.WriteLine($"Search<{typeof(T).Name}> Error: {ex.Message}");
+                throw;
             }
         }
 
-        public async Task AddItemAsync<T>(T item) where T : class
+        public async Task<List<Rental>> LoadAllRentalsWithDetailsAsync()
         {
-            _context.Set<T>().Add(item);
-            await _context.SaveChangesAsync();
-        }
+            var rentals = await _context._database.Table<Rental>().ToListAsync();
 
-        public async Task UpdateItemAsync<T>(T item) where T : class
-        {
-            _context.Set<T>().Update(item);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task DeleteItemAsync<T>(T item) where T : class
-        {
-            _context.Set<T>().Remove(item);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task<List<T>> Search<T>(Dictionary<string, string> filters) where T : class
-        {
-            IQueryable<T> query = _context.Set<T>();
-
-            foreach (var filter in filters)
+            foreach (var rental in rentals)
             {
-                var parameter = Expression.Parameter(typeof(T), "x");
-                var property = Expression.Property(parameter, filter.Key);
-                var propertyType = property.Type;
-                object convertedValue;
+                // Load the associated Student
+                rental.Student = await _context._database.Table<Student>().Where(s => s.Id == rental.StudentId).FirstOrDefaultAsync();
 
-                try
+                // Load the associated RentalBooks
+                rental.RentalBooks = await _context._database.Table<RentalBooks>().Where(rb => rb.RentalID == rental.Id).ToListAsync();
+
+                // Load each associated Book in RentalBooks
+                foreach (var rentalBook in rental.RentalBooks)
                 {
-                    convertedValue = Convert.ChangeType(filter.Value, propertyType);
+                    rentalBook.Book = await _context._database.Table<Book>().Where(b => b.Id == rentalBook.BookId).FirstOrDefaultAsync();
                 }
-                catch (Exception ex)
-                {
-                    throw new InvalidOperationException($"Failed to convert '{filter.Value}' to type '{propertyType}'", ex);
-                }
-
-                var constant = Expression.Constant(convertedValue);
-                var equals = Expression.Equal(property, constant);
-
-                var lambda = Expression.Lambda<Func<T, bool>>(equals, parameter);
-                query = query.Where(lambda);
             }
 
-            return await query.ToListAsync();
+            return rentals;
         }
+
     }
+
 }

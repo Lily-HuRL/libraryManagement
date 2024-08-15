@@ -7,7 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using libraryManagement.Models;
 using libraryManagement.Services;
-using Microsoft.EntityFrameworkCore;
 
 namespace libraryManagement.ViewModels
 {
@@ -16,7 +15,6 @@ namespace libraryManagement.ViewModels
         private ObservableCollection<Student> _students;
         private readonly GenericityService _genericityService;
 
-        // Pagination properties
         public int PageSize { get; set; } = 10;
         private int _currentPage = 1;
 
@@ -56,9 +54,8 @@ namespace libraryManagement.ViewModels
         {
             try
             {
-                var existingStudent = await _genericityService._context.Students
-                                              .FirstOrDefaultAsync(s => s.Id == id);
-                return existingStudent != null;
+                var existingStudent = await _genericityService.GetObjects<Student>();
+                return existingStudent.Any(s => s.Id == id);
             }
             catch (Exception ex)
             {
@@ -77,7 +74,6 @@ namespace libraryManagement.ViewModels
             catch (Exception ex)
             {
                 Console.WriteLine($"LoadStudentsAsync Error: {ex.Message}");
-                throw; // Rethrow the exception to ensure it can be caught further up the stack
             }
         }
 
@@ -123,7 +119,7 @@ namespace libraryManagement.ViewModels
         {
             try
             {
-                await _genericityService.DeleteItemAsync<Student>(student);
+                await _genericityService.DeleteItemAsync(student);
                 Students.Remove(student);
             }
             catch (Exception ex)
@@ -140,4 +136,3 @@ namespace libraryManagement.ViewModels
         }
     }
 }
-

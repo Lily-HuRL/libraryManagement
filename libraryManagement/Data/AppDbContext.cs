@@ -1,50 +1,57 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+﻿using SQLite;
 using libraryManagement.Models;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace libraryManagement.Data
 {
-    public class AppDbContext: DbContext
+    public class AppDbContext
     {
+        public readonly SQLiteAsyncConnection _database;
 
-        public DbSet<Book> Books { get; set; }
-        public DbSet<Student> Students { get; set; }
-        public DbSet<Rental> Rentals { get; set; }
-        public DbSet<RentalBooks> RentalBooks { get; set; }
-
-        public AppDbContext(DbContextOptions<AppDbContext> options): base(options)
+        public AppDbContext(SQLiteAsyncConnection database)
         {
-
+            _database = database;
+            Initialize(); // Synchronous table creation
         }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        private void Initialize()
         {
-            base.OnModelCreating(modelBuilder);
-
-            //modelBuilder.Entity<Customer>()
-            //    .HasIndex(c => c.Phone)
-            //    .IsUnique();
-
-            //modelBuilder.Entity<Customer>()
-            //    .HasIndex(c => c.Email)
-            //    .IsUnique();
+            _database.CreateTableAsync<Book>().Wait();
+            _database.CreateTableAsync<Student>().Wait();
+            _database.CreateTableAsync<Rental>().Wait();
+            _database.CreateTableAsync<RentalBooks>().Wait();
         }
 
-        public DbSet<T> GetDbSet<T>() where T : class
-        {
-            var property = typeof(AppDbContext).GetProperties()
-            .FirstOrDefault(p => p.PropertyType == typeof(DbSet<T>));
+        public SQLiteAsyncConnection Database => _database;
 
-            if (property != null)
+        public Task<List<Book>> GetBooksAsync()
+        {
+            return _database.Table<Book>().ToListAsync();
+        }
+
+        public Task<Book> GetBookAsync(int id)
+        {
+            return _database.Table<Book>().Where(i => i.Id == id).FirstOrDefaultAsync();
+        }
+
+        public Task<int> SaveBookAsync(Book book)
+        {
+            if (book.Id != 0)
             {
-                return (DbSet<T>)property.GetValue(this);
+                return _database.UpdateAsync(book);
             }
-
-            throw new InvalidOperationException($"DbSet for type {typeof(T).Name} not found.");
+            else
+            {
+                return _database.InsertAsync(book);
+            }
         }
+
+        public Task<int> DeleteBookAsync(Book book)
+        {
+            return _database.DeleteAsync(book);
+        }
+
+        // Implement similar methods for Student, Rental, RentalBooks
     }
 }
