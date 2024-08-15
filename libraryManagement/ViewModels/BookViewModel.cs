@@ -7,7 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using libraryManagement.Models;
 using libraryManagement.Services;
-using Microsoft.EntityFrameworkCore;
 
 namespace libraryManagement.ViewModels
 {
@@ -43,6 +42,7 @@ namespace libraryManagement.ViewModels
 
         public BookViewModel(GenericityService genericityService)
         {
+            _genericityService = genericityService;
             _books = new ObservableCollection<Book>();
         }
 
@@ -131,4 +131,3 @@ namespace libraryManagement.ViewModels
         }
     }
 }
-
