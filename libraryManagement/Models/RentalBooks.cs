@@ -1,23 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SQLite;
 
 namespace libraryManagement.Models
 {
+    [SQLite.Table("RentalBooks")]
     public class RentalBooks
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        [PrimaryKey, AutoIncrement]
         public int ID { get; set; }
-        public required Book Book { get; set; }
-        public required int Quantity { get; set; }
 
-        [ForeignKey("RentalID")]
+        public int BookId { get; set; }
+
+        [Ignore]
+        public Book Book { get; set; }
+
+        public int Quantity { get; set; }
+
         public int RentalID { get; set; }
-        public required Rental Rental { get; set; }
+
+        [Ignore]
+        public Rental Rental { get; set; }
     }
 }
+

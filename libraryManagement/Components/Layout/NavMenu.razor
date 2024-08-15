@@ -68,15 +68,15 @@
 
     private async Task NavigateIfLoggedIn(string targetPage)
     {
-        if (AuthService.IsLoggedIn)
-        {
-            NavManager.NavigateTo(targetPage);
-        }
-        else
-        {
-            await msgHelper.ShowMessage("please login!");
-            NavManager.NavigateTo("pagelogin");
-        }
+        // if (AuthService.IsLoggedIn)
+        // {
+        //     NavManager.NavigateTo(targetPage);
+        // }
+        // else
+        // {
+        //     await msgHelper.ShowMessage("please login!");
+        //     NavManager.NavigateTo("pagelogin");
+        // }
     }
 }
 

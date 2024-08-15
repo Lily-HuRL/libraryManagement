@@ -122,7 +122,6 @@
                         <td>@rental.Student.FirstName @rental.Student.LastName</td>
                         <td>@rental.RentalDate.ToString("yyyy-MM-dd")</td>
                         <td>@rental.ReturnDate.ToString("yyyy-MM-dd")</td>
-                        <td>@rental.RentalBooks.Sum(rb => rb.Quantity)</td>
                         <td>
                             @string.Join(", ", rental.RentalBooks.Select(rb => $"{rb.Book.Title} * {rb.Quantity}"))
                         </td>
@@ -137,6 +136,7 @@
 <div class="pagination d-flex align-items-center justify-content-end" style="align-content: center">
     <button class="btn btn-primary me-2" @onclick="BookRentalVM.PreviousPage" disabled="@(!BookRentalVM.HasPreviousPage)">Previous</button>
     <span class="me-2">Page @BookRentalVM.CurrentPage of @BookRentalVM.TotalPages</span>
+    <button class="btn btn-primary me-2" @onclick="BookRentalVM.NextPage" disabled="@(!BookRentalVM.HasNextPage)">Next</button>
     <button class="btn btn-primary me-2" @onclick="() => JumpPage(pageNumber)">Jump To</button>
     <input class="form-control me-2" style="width: 50px; height: 30px; padding: 2px;" placeholder="@BookRentalVM.CurrentPage" @bind-value="@pageNumber" />
 </div>
@@ -242,35 +242,30 @@
             return;
         }
 
-        // Create new Rental
-        var student = StudentVM.Students.First(s => s.Id == inputStudentID);
+        var student = StudentVM.Students.FirstOrDefault(s => s.Id == inputStudentID);
+        if (student == null)
+        {
+            await msgHelper.ShowMessage("Student does not exist!");
+            return;
+        }
+
         var newRental = new Rental
             {
-                Student = student,
+                StudentId = student.Id,
                 RentalDate = inputRentalDate,
                 ReturnDate = inputReturnDate,
-                RentalBooks = new List<RentalBooks>() // Initialize as empty, books will be added later
+                RentalBooks = new List<RentalBooks>()  // Initialize the list to hold rental books
             };
-
-        await BookRentalVM.AddRentalAsync(newRental);
 
         try
         {
-
-            // Now that Rental ID is generated, update RentalBooks with the Rental ID and Rental reference
             foreach (var rentalBook in tempRentalBooks)
             {
                 rentalBook.RentalID = newRental.Id;
                 rentalBook.Rental = newRental;
 
-                // Update the book's stock
                 var book = rentalBook.Book;
-                if (book.Stock >= rentalBook.Quantity)
-                {
-                    book.Stock -= rentalBook.Quantity;
-                    await BookVM.UpdateBookAsync(book); // Save the updated book stock
-                }
-                else
+                if (book.Stock <= rentalBook.Quantity)
                 {
                     await msgHelper.ShowMessage($"Not enough stock for book ID {book.Id}. Available: {book.Stock}, requested: {rentalBook.Quantity}");
                     return;
@@ -278,14 +273,17 @@
                 newRental.RentalBooks.Add(rentalBook);
             }
 
-            // Save updated Rental with books
-            await BookRentalVM.UpdateRentalAsync(newRental);
+            await BookRentalVM.AddRentalAsync(newRental);
 
+            // Close the modal
             CloseModal();
+            // Refresh the rental data to reflect the newly added rental
+            await BookRentalVM.LoadRentalsAsync();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"CompleteRental Error: {ex.Message}");
+            await msgHelper.ShowMessage("Failed to complete the rental. Please try again.");
         }
     }
 
@@ -298,11 +296,13 @@
             {
                 var rentalBook = new RentalBooks
                     {
+                        BookId = book.Id,
                         Book = book,
                         Quantity = inputQuantity,
                         RentalID = 0, // Initially set to 0, will be updated after Rental is created
                         Rental = null // Initially null, will be updated after Rental is created
                     };
+
                 tempRentalBooks.Add(rentalBook);
                 totalBooks += rentalBook.Quantity;
             }
@@ -316,7 +316,6 @@
             await msgHelper.ShowMessage("Invalid Book ID or Quantity");
         }
     }
-
 
     private void Select(Rental rental)
     {
