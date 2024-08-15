@@ -93,8 +93,14 @@ namespace libraryManagement.ViewModels
 
         public async Task Search(Dictionary<string, string> filters)
         {
+            System.Diagnostics.Debug.WriteLine($"Filters count: {filters.Count}");
             var result = await _genericityService.Search<Book>(filters);
             Books = new ObservableCollection<Book>(result);
+            
+            foreach (var book in result)
+            {
+                System.Diagnostics.Debug.WriteLine($"Filters count: {book.Title}");
+            }
         }
 
         public async Task AddBookAsync(Book book)

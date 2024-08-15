@@ -87,19 +87,20 @@ namespace libraryManagement.Services
 
         public async Task<List<T>> Search<T>(Dictionary<string, string> filters) where T : class, new()
         {
-            try
+            var query = _context._database.Table<T>();
+
+            foreach (var filter in filters)
             {
-                await EnsureTableExists<T>();  // Ensure the table exists before searching data
-                var query = _context._database.Table<T>();
-                // Applying filters is more complex and would require custom implementation
-                // You can loop through filters and apply them conditionally if needed
-                return await query.ToListAsync();
+                var parameter = Expression.Parameter(typeof(T), "x");
+                var property = Expression.PropertyOrField(parameter, filter.Key);
+                var constant = Expression.Constant(filter.Value);
+                var equality = Expression.Equal(property, constant);
+
+                var lambda = Expression.Lambda<Func<T, bool>>(equality, parameter);
+                query = query.Where(lambda);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Search<{typeof(T).Name}> Error: {ex.Message}");
-                throw;
-            }
+
+            return await query.ToListAsync();
         }
 
         public async Task<List<Rental>> LoadAllRentalsWithDetailsAsync()

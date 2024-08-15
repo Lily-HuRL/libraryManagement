@@ -158,8 +158,13 @@
             dict.Add("ISBN", inputISBN);
         }
 
-        Console.WriteLine(dict);
+        // Log the filters
+        foreach (var filter in dict)
+        {
+            System.Diagnostics.Debug.WriteLine($"Filter Key: {filter.Key}, Value: {filter.Value}");
+        }
         await BookVM.Search(dict);
+        StateHasChanged();
     }
 
     private async Task Add()
