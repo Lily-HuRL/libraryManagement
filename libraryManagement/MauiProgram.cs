@@ -28,8 +28,6 @@ namespace libraryManagement
             builder.Services.AddScoped<MessageHelper>();
 
             // Setup SQLite database path
-            // Use this line for cross-platform compatibility
-            //string dbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "library.db");
 
             string dbPath = "C:\\Users\\12206\\Desktop\\OOP2 assignments\\libraryManagement\\libraryManagement\\library.db";
 
