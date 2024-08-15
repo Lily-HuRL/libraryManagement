@@ -119,15 +119,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            await BookVM.LoadBooksAsync();
-            books = await genericityService.GetObjects<Models.Book>();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Initialization Error: {ex.Message}");
-        }
+        await BookVM.LoadBooksAsync();
+        books = await genericityService.GetObjects<Models.Book>();
     }
 
     private void Select(Models.Book book)
