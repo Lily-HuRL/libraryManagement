@@ -7,6 +7,7 @@ using SQLite;
 
 namespace libraryManagement.Models
 {
+    [SQLite.Table("Books")]
     public class Book
     {
         [PrimaryKey, AutoIncrement]
